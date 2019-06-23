@@ -7,7 +7,15 @@
     {
       "type": "node",
       "request": "launch",
-      "name": "Launch Program",
+      "name": "Redis",
+      "osx": {
+        "program": "${workspaceFolder}/redis-sandbox.js"
+      }
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Server",
       "osx": {
         "program": "${workspaceFolder}/index.js",
         "envFile": "${workspaceFolder}/.env"
