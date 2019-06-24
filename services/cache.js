@@ -1,21 +1,39 @@
 const mongoose = require('mongoose');
+const {
+  client,
+  hgetAsync
+} = require('./redis');
 
 const exec = mongoose.Query.prototype.exec;
 
-mongoose.Query.prototype.exec = function () {
+mongoose.Query.prototype.exec = async function () {
   console.log(`i'm about to run a query`);
-  const query = this.getQuery();
-  stringifyId(query);
-  console.log(query);
-  console.log(this.mongooseCollection.collectionName);
+
+  const key = createCacheKey(
+    this.getQuery(),
+    this.mongooseCollection.collectionName
+  );
   // check if query was run before
-    // if so return cache
-    // if not
-      // hit Mongo
-      // save query in cache
-  return exec.apply(this, arguments);
+  const cached = await client.hget(key.collection, key.query);
+  if (cached) {
+    return JSON.parse(cached);
+  }
+  // hit Mongo
+  const mongoResults = await exec.apply(this, arguments);
+  // save query in cache
+  client.hset(key.collection, key.query, JSON.stringify(mongoResults));
+  return mongoResults;
 };
 
-function stringifyId (query) {
-  return query._id && (query._id = query._id.toString());
+function createCacheKey(query, collectionName) {
+  const copy = {};
+  for (let key in query) {
+    if (key === '_id') {
+      copy[key] = query._id.toString();
+    } else { copy[key] = query[key]}
+  }
+  return {
+    collection: collectionName,
+    query: JSON.stringify(copy),
+  };
 }

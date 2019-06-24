@@ -7,5 +7,6 @@ module.exports = {
   googleClientID: GOOGLE_CLIENT_ID,
   googleClientSecret: GOOGLE_CLIENT_SECRET,
   mongoURI: 'mongodb://localhost/blog_dev',
-  cookieKey: '123123123'
+  cookieKey: '123123123',
+  redisURI: 'redis://localhost:6379',
 };
