@@ -1,22 +1,29 @@
 const mongoose = require('mongoose');
+const { capitalize } = require('lodash');
+const { DISABLE_CACHE } = process.env;
 const {
   client,
   hgetAsync
 } = require('./redis');
 
+
 const exec = mongoose.Query.prototype.exec;
 
-mongoose.Query.prototype.exec = async function () {
-  console.log(`i'm about to run a query`);
-
+mongoose.Query.prototype.exec = async function cachedExec() {
+  const collectionName = this.mongooseCollection.collectionName;
+  const Model = this.model;
   const key = createCacheKey(
     this.getQuery(),
-    this.mongooseCollection.collectionName
+    collectionName,
   );
   // check if query was run before
-  const cached = await client.hget(key.collection, key.query);
-  if (cached) {
-    return JSON.parse(cached);
+  const cachedJSON = await client.hget(key.collection, key.query);
+  if (cachedJSON) {
+    console.log(`Getting ${key.collection} docs from cache.`)
+    const cached = JSON.parse(cachedJSON);
+    return Array.isArray(cached)
+      ? cached.map(doc => new Model(doc))
+      : new Model(cached);
   }
   // hit Mongo
   const mongoResults = await exec.apply(this, arguments);
