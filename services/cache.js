@@ -3,13 +3,22 @@ const { capitalize } = require('lodash');
 const { DISABLE_CACHE } = process.env;
 const {
   client,
-  hgetAsync
 } = require('./redis');
 
 
 const exec = mongoose.Query.prototype.exec;
 
+mongoose.Query.prototype.cache = function(options = {}) {
+  const { key } = options;
+  this._useCache = true;
+  this.hashKey = JSON.stringify(key || 'defaultKey')
+  return this;
+}
+
 mongoose.Query.prototype.exec = async function cachedExec() {
+  if (!this._useCache) {
+    return exec.apply(this, arguments);
+  }
   const collectionName = this.mongooseCollection.collectionName;
   const Model = this.model;
   const key = createCacheKey(
@@ -17,7 +26,7 @@ mongoose.Query.prototype.exec = async function cachedExec() {
     collectionName,
   );
   // check if query was run before
-  const cachedJSON = await client.hget(key.collection, key.query);
+  const cachedJSON = await client.hget(this.hashKey, key.query);
   if (cachedJSON) {
     console.log(`Getting ${key.collection} docs from cache.`)
     const cached = JSON.parse(cachedJSON);
@@ -28,7 +37,7 @@ mongoose.Query.prototype.exec = async function cachedExec() {
   // hit Mongo
   const mongoResults = await exec.apply(this, arguments);
   // save query in cache
-  client.hset(key.collection, key.query, JSON.stringify(mongoResults));
+  client.hset(this.hashKey, key.query, JSON.stringify(mongoResults));
   return mongoResults;
 };
 
